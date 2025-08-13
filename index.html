@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Black & White Spin Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: #111;
+            color: white;
+        }
+
+        h1 {
+            margin-top: 20px;
+        }
+
+        #timer {
+            font-size: 1.2em;
+            color: #ffc107;
+            /* A gold-like color */
+            margin-bottom: 10px;
+        }
+
+        .task-container {
+            margin: 20px auto;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #333;
+            border-radius: 10px;
+            border: 1px solid #555;
+            overflow: hidden;
+            /* Ensures the inner bar stays rounded */
+        }
+
+        .progress-bar {
+            width: 0%;
+            /* Initial width */
+            height: 20px;
+            background: linear-gradient(90deg, rgba(255, 215, 0, 1) 0%, rgba(255, 165, 0, 1) 100%);
+            /* Gold to Orange gradient */
+            border-radius: 10px;
+            transition: width 0.5s ease-in-out;
+            text-align: center;
+            line-height: 20px;
+            color: black;
+            font-weight: bold;
+        }
+
+        #walletValue {
+            color: #4CAF50;
+            /* Green color for money */
+            font-weight: bold;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 90vw;
+            /* Responsive width */
+            max-width: 300px;
+            /* Max size on larger screens */
+            margin: 30px auto;
+            aspect-ratio: 1 / 1;
+            /* Maintain square shape */
+        }
+
+        canvas {
+            border-radius: 50%;
+            background: #fff;
+            width: 100%;
+            /* Make canvas fill the container */
+            height: 100%;
+        }
+
+        .pointer {
+            position: absolute;
+            top: -20px;
+            left: 45%;
+            transform: rotate(180deg);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-bottom: 30px solid red;
+        }
+        
+
+        .color-btn.selected {
+            border: 3px solid gold;
+            transform: scale(1.1);
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            transition: transform 0.2s ease;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .color-btn {
+            width: 80px;
+        }
+
+        .bet-input {
+            width: 80px;
+            padding: 10px;
+            text-align: center;
+            font-size: 16px;
+            border: 1px solid #555;
+            background: #333;
+            color: white;
+            border-radius: 5px;
+            box-sizing: border-box;
+            /* Important for consistent sizing */
+        }
+
+        #spinBtn {
+            background: gold;
+            font-weight: bold;
+        }
+
+        .controls-container {
+            display: flex;
+            flex-wrap: wrap;
+            /* Allows items to wrap to the next line on small screens */
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            /* Space between items */
+            margin: 20px 10px;
+            /* Add some horizontal margin for small screens */
+        }
+
+        #withdrawBtn {
+            background-color: #4CAF50;
+            /* Green */
+            color: white;
+            font-weight: bold;
+            display: none;
+            /* Hidden by default */
+        }
+
+        #getFreeCoinsBtn {
+            background-color: #007bff; /* A nice blue color */
+            color: white;
+            font-weight: bold;
+            display: none; /* Hidden by default */
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <h1>🎯 Black & White Spin Game</h1>
+
+    <p id="timer">Time Left: 10:00</p>
+
+    <div class="task-container">
+        <p>Task: Reach <span id="targetCoins">500</span> coins!</p>
+        <div class="progress-container">
+            <div id="progressBar" class="progress-bar"></div>
+        </div>
+    </div>
+
+    <p>Your Wallet Value: <span id="walletValue">₹0.00</span></p>
+    <p style="font-size: 0.8em; opacity: 0.7;">(Conversion: 100 coins = ₹1)</p>
+
+
+    <p>Coins: <span id="coins">100</span></p>
+
+    <div class="controls-container">
+        <button id="selectBlack" class="color-btn" style="background:black;color:white;">Black</button>
+        <button id="selectWhite" class="color-btn" style="background:white;color:black;">White</button>
+        <label for="betAmount">Bet:</label>
+        <input type="number" id="betAmount" class="bet-input" value="10" min="1">
+        <button id="spinBtn">SPIN</button>
+        <button id="withdrawBtn">Claim on Telegram</button>
+        <button id="getFreeCoinsBtn">Get 20 Free Coins</button>
+    </div>
+
+    <div class="wheel-container">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="300" height="300"></canvas>
+    </div>
+
+    <p id="result"></p>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            // --- DOM Elements ---
+            const canvas = document.getElementById("wheel");
+            const ctx = canvas.getContext("2d");
+            const coinsEl = document.getElementById("coins");
+            const blackBtn = document.getElementById("selectBlack");
+            const whiteBtn = document.getElementById("selectWhite");
+            const betAmountEl = document.getElementById("betAmount");
+            const spinBtn = document.getElementById("spinBtn");
+            const resultEl = document.getElementById("result");
+            const progressBarEl = document.getElementById("progressBar");
+            const targetCoinsEl = document.getElementById("targetCoins");
+            const walletValueEl = document.getElementById("walletValue");
+            const timerEl = document.getElementById("timer");
+            const withdrawBtn = document.getElementById("withdrawBtn");
+            const getFreeCoinsBtn = document.getElementById("getFreeCoinsBtn");
+            let timerInterval = null; // To hold the timer ID
+
+
+            // --- Constants ---
+            const SLICES = 16;
+            const COLORS = ["black", "white"];
+            const ANGLE_PER_SLICE = (2 * Math.PI) / SLICES;
+            const WHEEL_RADIUS = canvas.width / 2;
+            const TARGET_COINS = 500;
+            const COINS_PER_RUPEE = 100;
+            const WIN_PROBABILITY = 0.40; // 40% chance to win. Makes the game even harder.
+            const TASK_DURATION_MINUTES = 10;
+            const TASK_DURATION_MS = TASK_DURATION_MINUTES * 60 * 1000;
+
+            // !!! IMPORTANT: REPLACE WITH YOUR TELEGRAM USERNAME !!!
+            const TELEGRAM_USERNAME = "BikkyChauhan"; // <-- PASTE YOUR TELEGRAM USERNAME HERE (without @)
+
+            // --- Game State ---
+            const gameState = {
+                coins: localStorage.getItem("coins") ? parseInt(localStorage.getItem("coins")) : 100,
+                selectedColor: null,
+                isSpinning: false,
+                taskStartTime: localStorage.getItem("taskStartTime") ? parseInt(localStorage.getItem("taskStartTime")) : Date.now(),
+                isTimeUp: false
+            };
+
+            // --- Functions ---
+
+            function drawWheel(rotation = 0) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (let i = 0; i < SLICES; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(WHEEL_RADIUS, WHEEL_RADIUS);
+                    ctx.arc(WHEEL_RADIUS, WHEEL_RADIUS, WHEEL_RADIUS, ANGLE_PER_SLICE * i + rotation, ANGLE_PER_SLICE * (i + 1) + rotation);
+                    ctx.fillStyle = COLORS[i % 2];
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+
+            function updateUI() {
+                coinsEl.innerText = gameState.coins;
+                localStorage.setItem("coins", gameState.coins);
+                targetCoinsEl.innerText = TARGET_COINS;
+
+                const taskComplete = gameState.coins >= TARGET_COINS && gameState.isTimeUp;
+                const outOfCoins = gameState.coins === 0;
+
+                // Update Progress Bar & Withdraw Button
+                if (taskComplete) {
+                    progressBarEl.innerText = "Task Complete! 🎉";
+                    progressBarEl.style.width = `100%`;
+                    withdrawBtn.style.display = "inline-block";
+                    withdrawBtn.disabled = false; // Ensure button is clickable
+                } else {
+                    const progressPercentage = Math.min((gameState.coins / TARGET_COINS) * 100, 100);
+                    progressBarEl.style.width = `${progressPercentage}%`;
+                    progressBarEl.innerText = `${Math.floor(progressPercentage)}%`;
+                    withdrawBtn.style.display = "none";
+                }
+
+                // Show/Hide "Get Free Coins" button
+                getFreeCoinsBtn.style.display = outOfCoins && !taskComplete ? 'inline-block' : 'none';
+
+                // Update Wallet Value
+                const moneyValue = gameState.coins / COINS_PER_RUPEE;
+                walletValueEl.innerText = `₹${moneyValue.toFixed(2)}`;
+
+                // Update button styles
+                blackBtn.classList.toggle("selected", gameState.selectedColor === "black");
+                whiteBtn.classList.toggle("selected", gameState.selectedColor === "white");
+
+                // Disable/Enable buttons based on state
+                const controlsShouldBeDisabled = gameState.isSpinning || taskComplete;
+                blackBtn.disabled = controlsShouldBeDisabled;
+                whiteBtn.disabled = controlsShouldBeDisabled;
+                spinBtn.disabled = controlsShouldBeDisabled || outOfCoins;
+                betAmountEl.disabled = controlsShouldBeDisabled || outOfCoins;
+            }
+
+            function handleColorSelect(color) {
+                if (gameState.isSpinning) return;
+                gameState.selectedColor = color;
+                updateUI();
+            }
+
+            function handleSpin() {
+                if (gameState.isSpinning) return;
+
+                const bet = parseInt(betAmountEl.value);
+
+                if (!gameState.selectedColor) {
+                    alert("Please select a color first!");
+                    return;
+                }
+                if (isNaN(bet) || bet <= 0 || bet > gameState.coins) {
+                    alert("Invalid bet amount. Please enter a valid amount you can afford.");
+                    return;
+                }
+
+                gameState.isSpinning = true;
+                resultEl.innerText = "Spinning...";
+                updateUI();
+
+                // --- MODIFIED LOGIC ---
+                // 1. Determine if the user wins or loses based on a set probability.
+                const isWinningSpin = Math.random() < WIN_PROBABILITY;
+                const winningColor = isWinningSpin ? gameState.selectedColor : (gameState.selectedColor === 'black' ? 'white' : 'black');
+                // 2. Find a random slice index that matches the determined outcome.
+                let possibleIndices = [];
+                for (let i = 0; i < SLICES; i++) {
+                    if (COLORS[i % 2] === winningColor) {
+                        possibleIndices.push(i);
+                    }
+                }
+                const randomIndex = possibleIndices[Math.floor(Math.random() * possibleIndices.length)];
+
+                const fullSpins = 5;
+                // Calculate final angle to point to the middle of the winning slice
+                const randomOffset = (Math.random() - 0.5) * ANGLE_PER_SLICE * 0.8; // Add some randomness
+                const finalRotation = (fullSpins * 2 * Math.PI) + (ANGLE_PER_SLICE * (SLICES - 1 - randomIndex)) + (ANGLE_PER_SLICE / 2) + randomOffset;
+
+                let start = null;
+                const duration = 4000; // ms
+
+                function animate(timestamp) {
+                    if (!start) start = timestamp;
+                    let progress = (timestamp - start) / duration;
+                    if (progress > 1) progress = 1;
+
+                    const easeOutProgress = 1 - Math.pow(1 - progress, 4); // easeOutQuart for a smoother stop
+                    const currentAngle = finalRotation * easeOutProgress;
+                    drawWheel(currentAngle);
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        // Spin finished
+                        if (winningColor === gameState.selectedColor) {
+                            gameState.coins += bet;
+                            resultEl.innerText = `🎉 You WON! It landed on ${winningColor}. You won ${bet} coins.`;
+                        } else {
+                            gameState.coins -= bet;
+                            resultEl.innerText = `😢 You LOST! It landed on ${winningColor}. You lost ${bet} coins.`;
+                        }
+                        gameState.isSpinning = false;
+                        updateUI();
+                    }
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            function startTimer() {
+                // Clear any existing timer before starting a new one
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                }
+                localStorage.setItem("taskStartTime", gameState.taskStartTime);
+
+                timerInterval = setInterval(() => {
+                    const elapsedTime = Date.now() - gameState.taskStartTime;
+                    const remainingTime = TASK_DURATION_MS - elapsedTime;
+
+                    if (remainingTime <= 0) {
+                        clearInterval(timerInterval);
+                        timerEl.innerText = "Time's up! Complete the coin task.";
+                        gameState.isTimeUp = true;
+                        updateUI(); // Re-check if task is complete
+                    } else {
+                        const minutes = Math.floor((remainingTime / 1000) / 60);
+                        const seconds = Math.floor((remainingTime / 1000) % 60);
+                        timerEl.innerText = `Time Left: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                    }
+                }, 1000);
+            }
+
+            // --- Initial Setup ---
+            blackBtn.addEventListener("click", () => handleColorSelect("black"));
+            whiteBtn.addEventListener("click", () => handleColorSelect("white"));
+            spinBtn.addEventListener("click", handleSpin);
+
+            drawWheel();
+            updateUI();
+            startTimer();
+
+            // Event Listeners
+            withdrawBtn.addEventListener("click", () => {
+                // Disable the button immediately to prevent multiple clicks
+                withdrawBtn.disabled = true;
+
+                if (TELEGRAM_USERNAME === "YOUR_USERNAME_HERE") {
+                    alert("Error: Telegram username is not configured by the developer.");
+                    // Re-enable on error so the user knows it's a config issue
+                    withdrawBtn.disabled = false;
+                    return;
+                }
+
+                // --- Create a detailed message for Telegram ---
+                const coins = gameState.coins;
+                const value = (coins / COINS_PER_RUPEE).toFixed(2);
+                const message = `Hello! Hello! ẞ_(┻⁠━ ⁠ヘ⁠╰દ__メ╯⁠╰ʕʔ⁠人ꈍ⁠\⁠0⁠/ I have completed the task.\n\nCoins: ${coins}\nValue: ₹${value}\n\nPlease process my withdrawal.`;
+                const encodedMessage = encodeURIComponent(message);
+                const telegramUrl = `https://t.me/${TELEGRAM_USERNAME}?text=${encodedMessage}`;
+
+                window.open(telegramUrl, '_blank');
+
+                // Reset the task so the user can play again
+                // Using a small delay to ensure the new tab opens smoothly
+                setTimeout(() => {
+                    alert("Task claimed! Your progress has been reset. You can start a new task now.");
+                    gameState.coins = 100;
+                    gameState.taskStartTime = Date.now(); // Reset timer start time
+                    gameState.isTimeUp = false; // Reset time up flag
+                    startTimer(); // Restart the timer from 10 minutes
+                    updateUI(); // Update the UI to reflect the reset state
+                }, 500);
+            });
+            getFreeCoinsBtn.addEventListener("click", () => {
+                // Future-proof: You can show an ad here before giving coins.
+                gameState.coins += 20;
+                resultEl.innerText = "You received 20 free coins!";
+                updateUI();
+            });
+        });
+    </script>
+
+</body>
+
+</html>
